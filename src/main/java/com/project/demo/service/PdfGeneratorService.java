@@ -2,34 +2,44 @@ package com.project.demo.service;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
-import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.font.PDType0Font;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.springframework.stereotype.Service;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-
 @Service
 public class PdfGeneratorService {
+
+    private final String FONT_PATH = "fonts/OpenSans-Regular.ttf"; // Ruta relativa en resources
+
     public byte[] generatePdfFromText(String text, String filename) throws IOException {
         try (PDDocument document = new PDDocument()) {
             PDPage page = new PDPage(PDRectangle.A4);
             document.addPage(page);
 
-            PDPageContentStream contentStream = null;
             float margin = 50;
             float yStart = page.getMediaBox().getHeight() - margin;
             float xStart = margin;
             float width = page.getMediaBox().getWidth() - 2 * margin;
             float fontSize = 12;
-            float leading = 14.5f; // Espaciado entre líneas (mayor que fontSize para espacio)
-            PDFont font = PDType1Font.HELVETICA;
-
+            float leading = 14.5f;
             float currentY = yStart;
+
+            // Cargar fuente personalizada
+            InputStream fontStream = getClass().getClassLoader().getResourceAsStream(FONT_PATH);
+            if (fontStream == null) {
+                throw new IOException("No se pudo cargar la fuente desde: " + FONT_PATH);
+            }
+            PDFont font = PDType0Font.load(document, fontStream);
+
+            PDPageContentStream contentStream = null;
 
             try {
                 contentStream = new PDPageContentStream(document, page);
@@ -47,6 +57,7 @@ public class PdfGeneratorService {
                         if (currentY - leading < margin) {
                             contentStream.endText();
                             contentStream.close();
+
                             page = new PDPage(PDRectangle.A4);
                             document.addPage(page);
                             contentStream = new PDPageContentStream(document, page);
@@ -121,6 +132,7 @@ public class PdfGeneratorService {
                 currentLine.append(word);
             }
         }
+
         if (currentLine.length() > 0) {
             lines.add(currentLine.toString());
         }
