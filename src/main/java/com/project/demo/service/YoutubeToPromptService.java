@@ -76,14 +76,13 @@ public class YoutubeToPromptService {
         commandArgs.add(youtubeUrl);
 
         System.out.println("DEBUG: yt-dlp path being used by Java: " + ytDlpPath);
-        System.out.println("DEBUG: yt-dlp command arguments: " + String.join(" ", commandArgs)); // For debugging the full command
+        System.out.println("DEBUG: yt-dlp command arguments: " + String.join(" ", commandArgs));
 
         ProcessBuilder builder = new ProcessBuilder(commandArgs);
 
-        builder.redirectErrorStream(true); // Redirige stderr a stdout para capturar errores del proceso
+        builder.redirectErrorStream(true);
         Process process = builder.start();
-
-        // Capturar la salida de yt-dlp (para depuración)
+        
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
             String line;
             while ((line = reader.readLine()) != null) {
