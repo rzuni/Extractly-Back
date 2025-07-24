@@ -48,10 +48,8 @@ public class YoutubePdfController {
                 return ResponseEntity.status(HttpStatus.NO_CONTENT)
                         .body("No se pudo obtener una transcripción útil del video. El video podría no tener audio o el idioma no ser compatible.".getBytes());
             }
-            System.out.println("Paso 1 completado. Transcripción obtenida (primeros 100 caracteres): " + transcripcion.substring(0, Math.min(transcripcion.length(), 100)) + "...");
 
             // Paso 2: Generar el prompt final para Gemini y resumir
-            System.out.println("Iniciando Paso 2: Generando resumen con Gemini.");
             String baseGeminiPrompt = "Genera un resumen en español, claro y conciso, del siguiente contenido de un video de YouTube, organizando los puntos clave en párrafos separados:\n\n" + transcripcion;
             String finalGeminiPrompt = (customPrompt != null && !customPrompt.trim().isEmpty()) ?
                     customPrompt.trim() + "\n\nContenido a resumir:\n" + transcripcion :
@@ -64,11 +62,8 @@ public class YoutubePdfController {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                         .body("El modelo Gemini no pudo generar un resumen útil. Intenta con un prompt diferente o verifica el contenido del video.".getBytes());
             }
-            System.out.println("Paso 2 completado. Resumen de Gemini obtenido (primeros 100 caracteres): " + resumen.substring(0, Math.min(resumen.length(), 100)) + "...");
-
 
             // Paso 3: Generar el PDF con el resumen
-            System.out.println("Iniciando Paso 3: Generando el PDF con el resumen.");
             String nombreArchivo = "resumen_video_gemini.pdf";
             byte[] pdf = pdfGeneratorService.generatePdfFromText(resumen, nombreArchivo);
 
@@ -77,10 +72,8 @@ public class YoutubePdfController {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                         .body("Error al generar el archivo PDF del resumen.".getBytes());
             }
-            System.out.println("Paso 3 completado. PDF generado exitosamente.");
 
             // Paso 4: Retornar el PDF como archivo descargable
-            System.out.println("Retornando PDF al cliente.");
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + nombreArchivo)
                     .contentType(MediaType.APPLICATION_PDF)
