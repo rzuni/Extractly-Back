@@ -28,7 +28,7 @@ public class YoutubePdfController {
     public ResponseEntity<byte[]> generarPdfDesdeYoutube(
             @RequestParam String youtubeUrl,
             @RequestParam(defaultValue = "es-ES") String languageCode,
-            @RequestParam(required = false) String customPrompt // Optional custom prompt for Gemini
+            @RequestParam(required = false) String customPrompt
     ) {
         if (youtubeUrl == null || youtubeUrl.trim().isEmpty()) {
             System.err.println("Error: La URL de YouTube no puede estar vacía.");
@@ -41,12 +41,11 @@ public class YoutubePdfController {
             System.out.println("Iniciando Paso 1: Obteniendo transcripción del video de YouTube: " + youtubeUrl);
             String transcripcion = youtubeToPromptService.generatePromptFromYoutubeUrl(youtubeUrl, languageCode);
 
-            // Check if transcription is null, empty, or indicates no useful content
             if (transcripcion == null || transcripcion.trim().isEmpty() ||
-                    transcripcion.contains("No se pudo extraer una transcripción útil") || // From YoutubeToPromptService
-                    transcripcion.contains("La transcripción resultante está vacía")) { // From YoutubeToPromptService
+                    transcripcion.contains("No se pudo extraer una transcripción útil") ||
+                    transcripcion.contains("La transcripción resultante está vacía")) {
                 System.err.println("Error: No se pudo obtener una transcripción útil del video. Transcripción: " + transcripcion);
-                return ResponseEntity.status(HttpStatus.NO_CONTENT) // 204 No Content if no useful data
+                return ResponseEntity.status(HttpStatus.NO_CONTENT)
                         .body("No se pudo obtener una transcripción útil del video. El video podría no tener audio o el idioma no ser compatible.".getBytes());
             }
             System.out.println("Paso 1 completado. Transcripción obtenida (primeros 100 caracteres): " + transcripcion.substring(0, Math.min(transcripcion.length(), 100)) + "...");
@@ -58,9 +57,8 @@ public class YoutubePdfController {
                     customPrompt.trim() + "\n\nContenido a resumir:\n" + transcripcion :
                     baseGeminiPrompt;
 
-            String resumen = googleCloudApiService.askGemini(finalGeminiPrompt); // Using askGemini method from your service
+            String resumen = googleCloudApiService.askGemini(finalGeminiPrompt);
 
-            // Check if Gemini returned a useful summary
             if (resumen == null || resumen.trim().isEmpty() || resumen.contains("No se pudo obtener una respuesta de texto de Gemini.")) { // Check for specific error message
                 System.err.println("Error: El modelo Gemini no pudo generar un resumen útil. Respuesta: " + resumen);
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -72,7 +70,7 @@ public class YoutubePdfController {
             // Paso 3: Generar el PDF con el resumen
             System.out.println("Iniciando Paso 3: Generando el PDF con el resumen.");
             String nombreArchivo = "resumen_video_gemini.pdf";
-            byte[] pdf = pdfGeneratorService.generatePdfFromText(resumen, nombreArchivo); // Using generatePdfFromText method from your service
+            byte[] pdf = pdfGeneratorService.generatePdfFromText(resumen, nombreArchivo);
 
             if (pdf == null || pdf.length == 0) {
                 System.err.println("Error: El PdfGeneratorService generó un PDF vacío o nulo.");
@@ -92,7 +90,7 @@ public class YoutubePdfController {
             System.err.println("Error en la URL o argumentos: " + e.getMessage());
             return ResponseEntity.badRequest()
                     .body(("Error en los parámetros de la solicitud: " + e.getMessage()).getBytes());
-        } catch (IOException e) { // Catch IOException specifically for font loading in PdfGeneratorService
+        } catch (IOException e) {
             System.err.println("Error de E/S al generar el PDF (ej. fuente no encontrada): " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -100,7 +98,7 @@ public class YoutubePdfController {
         }
         catch (Exception e) {
             System.err.println("Error interno del servidor al procesar la solicitud: " + e.getMessage());
-            e.printStackTrace(); // Imprimir el stack trace para depuración detallada
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(("Error interno del servidor: " + e.getLocalizedMessage()).getBytes());
         }

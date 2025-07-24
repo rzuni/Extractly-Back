@@ -5,15 +5,14 @@ import com.google.cloud.storage.*;
 import com.google.cloud.videointelligence.v1.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList; // Import ArrayList
-import java.util.List;    // Import List
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -22,18 +21,15 @@ import java.util.regex.Pattern;
 @Service
 public class YoutubeToPromptService {
 
-    // IMPORTANT: Ensure these are correctly read from application.properties
     @Value("${gcp.project.id}")
     private String projectId;
 
     @Value("${google.cloud.bucket-name}")
     private String bucketName;
 
-    // This property needs to be set in application.properties
     @Value("${yt-dlp.path}")
-    private String ytDlpPath; // This will now hold the full path to the executable
+    private String ytDlpPath;
 
-    // Storage client (should be initialized once, perhaps in constructor or @PostConstruct)
     private final Storage storage;
 
     public YoutubeToPromptService(
@@ -67,25 +63,22 @@ public class YoutubeToPromptService {
 
         // 1. Descargar video con yt-dlp (audio preferido)
         String outputFileName = videoId + "-" + UUID.randomUUID() + ".mp4";
-        Path localPath = Paths.get(outputFileName); // Get the local path object
+        Path localPath = Paths.get(outputFileName);
 
-        // Construct the command arguments as a List of strings
         List<String> commandArgs = new ArrayList<>();
-        commandArgs.add(ytDlpPath); // First argument is the executable path
+        commandArgs.add(ytDlpPath);
         commandArgs.add("-f");
-        commandArgs.add("bestaudio[ext=m4a]"); // yt-dlp option for best audio
+        commandArgs.add("bestaudio[ext=m4a]");
         commandArgs.add("--merge-output-format");
-        commandArgs.add("mp4"); // Output format after merging
+        commandArgs.add("mp4");
         commandArgs.add("-o");
-        commandArgs.add(localPath.toAbsolutePath().toString()); // Use absolute path for output file
+        commandArgs.add(localPath.toAbsolutePath().toString());
         commandArgs.add(youtubeUrl);
 
         System.out.println("DEBUG: yt-dlp path being used by Java: " + ytDlpPath);
         System.out.println("DEBUG: yt-dlp command arguments: " + String.join(" ", commandArgs)); // For debugging the full command
 
         ProcessBuilder builder = new ProcessBuilder(commandArgs);
-        // Set the working directory to where you want the file to be saved, e.g., current directory
-        // builder.directory(localPath.getParent().toFile()); // This might be useful if you're saving elsewhere
 
         builder.redirectErrorStream(true); // Redirige stderr a stdout para capturar errores del proceso
         Process process = builder.start();
@@ -100,14 +93,12 @@ public class YoutubeToPromptService {
 
         int exitCode = process.waitFor();
         if (exitCode != 0) {
-            // Read error stream again if redirectErrorStream(true) is not providing enough info for some reason
             throw new RuntimeException("Error al ejecutar yt-dlp. Código de salida: " + exitCode + " para URL: " + youtubeUrl + ". Revisa la salida de yt-dlp en los logs.");
         }
         System.out.println("Descarga completada. Archivo: " + outputFileName);
 
 
         // 2. Subir a GCS
-        // Using the Storage object initialized in the constructor
         String gcsObjectName = "youtube-transcripts/" + outputFileName;
 
         BlobId blobId = BlobId.of(bucketName, gcsObjectName);
