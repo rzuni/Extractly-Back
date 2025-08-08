@@ -38,7 +38,6 @@ public class YoutubePdfController {
 
         try {
             // Paso 1: Obtener transcripción del video
-            System.out.println("Iniciando Paso 1: Obteniendo transcripción del video de YouTube: " + youtubeUrl);
             String transcripcion = youtubeToPromptService.generatePromptFromYoutubeUrl(youtubeUrl, languageCode);
 
             if (transcripcion == null || transcripcion.trim().isEmpty() ||
