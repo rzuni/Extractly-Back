@@ -11,6 +11,12 @@ import java.awt.Color;
 @Service
 public class PptxGeneratorService {
 
+    // Constantes para configuración de texto
+    private static final int MAX_CHARS_PER_LINE = 90;
+    private static final double LINE_SPACING = 10.0;
+    private static final double DEFAULT_FONT_SIZE = 24.0;
+    private static final int MAX_LINES_PER_SLIDE = 6;
+
     public byte[] generatePptxFromSummary(String summaryText) {
         try (XMLSlideShow ppt = new XMLSlideShow()) {
 
@@ -38,20 +44,15 @@ public class PptxGeneratorService {
                 XSLFTextParagraph p = subtitleShape.addNewTextParagraph();
                 XSLFTextRun r = p.addNewTextRun();
                 r.setText("Generado automáticamente por el sistema");
-                r.setFontSize(24.0);
+                r.setFontSize(DEFAULT_FONT_SIZE);
                 subtitleShape.setHorizontalCentered(true);
             }
-
-            // Configuración general de texto
-            double fontSize = 24.0;
-            int maxLinesPerSlide = 6;
 
             String[] lines;
             if (summaryText.contains("\n")) {
                 lines = summaryText.split("\n");
             } else {
-                // Dividir por bloques de palabras si no hay saltos de línea
-                lines = splitIntoLineBlocks(summaryText, 90); // Estimar 90 caracteres por línea
+                lines = splitIntoLineBlocks(summaryText, MAX_CHARS_PER_LINE);
             }
 
             XSLFSlide currentSlide = null;
@@ -59,7 +60,7 @@ public class PptxGeneratorService {
             int lineCounter = 0;
 
             for (String line : lines) {
-                if (currentSlide == null || lineCounter >= maxLinesPerSlide) {
+                if (currentSlide == null || lineCounter >= MAX_LINES_PER_SLIDE) {
                     currentSlide = ppt.createSlide(blankLayout);
                     currentTextBox = currentSlide.createTextBox();
                     currentTextBox.setAnchor(new Rectangle(100, 100, 1080, 520));
@@ -69,16 +70,16 @@ public class PptxGeneratorService {
 
                 XSLFTextParagraph paragraph = currentTextBox.addNewTextParagraph();
                 paragraph.setTextAlign(TextParagraph.TextAlign.LEFT);
-                paragraph.setSpaceAfter(10.0); // Espacio entre líneas
+                paragraph.setSpaceAfter(LINE_SPACING);
 
                 XSLFTextRun textRun = paragraph.addNewTextRun();
                 textRun.setText(line.trim());
-                textRun.setFontSize(fontSize);
+                textRun.setFontSize(DEFAULT_FONT_SIZE);
                 textRun.setFontFamily("OpenSans");
                 textRun.setFontColor(Color.BLACK);
                 textRun.setBold(false);
 
-                lineCounter = getLineCounter(lineCounter);
+                lineCounter++;
             }
 
             try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -91,11 +92,6 @@ public class PptxGeneratorService {
             e.printStackTrace();
             throw new RuntimeException("Error al generar PPTX", e);
         }
-    }
-
-    private static int getLineCounter(int lineCounter) {
-        lineCounter++;
-        return lineCounter;
     }
 
     private String[] splitIntoLineBlocks(String text, int maxCharsPerLine) {
