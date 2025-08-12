@@ -29,8 +29,10 @@ public class PasswordResetService {
     @Autowired
     private JavaMailSender mailSender;
 
-    @Value("${http://localhost:4200/}")
+    @Value("${app.frontend.url}")
     private String frontUrl;
+
+    private static final int TOKEN_EXPIRATION_TIME = 30;
 
     public void createPasswordResetTokenForUser(String email){
         User user = userRepository.findByEmail(email)
@@ -38,7 +40,7 @@ public class PasswordResetService {
 
         if(user != null){
             String token = UUID.randomUUID().toString();
-            LocalDateTime expiryDate = LocalDateTime.now().plusMinutes(30); //Se define el tiempo de validación del token, en este caso 30 minutos
+            LocalDateTime expiryDate = LocalDateTime.now().plusMinutes(TOKEN_EXPIRATION_TIME);
 
             //Elimina tokens anteriores para el mismo usuario para evitar múltiples enlaces válidos
             tokenRepository.findByUser(user).ifPresent(tokenRepository::delete);
