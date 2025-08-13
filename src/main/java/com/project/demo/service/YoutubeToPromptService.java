@@ -75,9 +75,6 @@ public class YoutubeToPromptService {
         commandArgs.add(localPath.toAbsolutePath().toString());
         commandArgs.add(youtubeUrl);
 
-        System.out.println("DEBUG: yt-dlp path being used by Java: " + ytDlpPath);
-        System.out.println("DEBUG: yt-dlp command arguments: " + String.join(" ", commandArgs));
-
         ProcessBuilder builder = new ProcessBuilder(commandArgs);
 
         builder.redirectErrorStream(true);
@@ -86,7 +83,6 @@ public class YoutubeToPromptService {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                System.out.println("yt-dlp: " + line);
             }
         }
 
@@ -94,7 +90,6 @@ public class YoutubeToPromptService {
         if (exitCode != 0) {
             throw new RuntimeException("Error al ejecutar yt-dlp. Código de salida: " + exitCode + " para URL: " + youtubeUrl + ". Revisa la salida de yt-dlp en los logs.");
         }
-        System.out.println("Descarga completada. Archivo: " + outputFileName);
 
 
         // 2. Subir a GCS
@@ -102,21 +97,15 @@ public class YoutubeToPromptService {
 
         BlobId blobId = BlobId.of(bucketName, gcsObjectName);
         BlobInfo blobInfo = BlobInfo.newBuilder(blobId).build();
-
-        System.out.println("Subiendo archivo a GCS: " + gcsUri(bucketName, gcsObjectName));
         storage.create(blobInfo, Files.readAllBytes(localPath));
         String gcsUri = gcsUri(bucketName, gcsObjectName);
-        System.out.println("Archivo subido a GCS: " + gcsUri);
 
         // 3. Transcribir usando Video Intelligence
-        System.out.println("Iniciando transcripción con Video Intelligence...");
         String prompt = getTranscriptFromGcs(gcsUri, languageCode);
-        System.out.println("Transcripción completada.");
 
         // 4. Eliminar archivo local
         try {
             Files.deleteIfExists(localPath);
-            System.out.println("Archivo local eliminado: " + localPath);
         } catch (IOException e) {
             System.err.println("Error al eliminar archivo local: " + localPath + " - " + e.getMessage());
         }
@@ -124,7 +113,6 @@ public class YoutubeToPromptService {
         // 5. Eliminar archivo de GCS (OPCIONAL, pero recomendado para archivos temporales)
         try {
             storage.delete(blobId);
-            System.out.println("Archivo en GCS eliminado: " + gcsUri);
         } catch (StorageException e) {
             System.err.println("Error al eliminar archivo de GCS: " + gcsUri + " - " + e.getMessage());
         }
@@ -162,7 +150,6 @@ public class YoutubeToPromptService {
 
             for (VideoAnnotationResults result : response.getAnnotationResultsList()) {
                 if (result.getSpeechTranscriptionsList().isEmpty()) {
-                    System.out.println("No hay transcripciones de voz en este segmento de video.");
                     continue;
                 }
                 for (SpeechTranscription transcription : result.getSpeechTranscriptionsList()) {

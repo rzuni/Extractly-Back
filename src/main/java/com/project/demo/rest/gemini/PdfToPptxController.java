@@ -50,7 +50,7 @@ public class PdfToPptxController {
                 promptForGemini = customPrompt + "\n\nTexto a resumir: " + extractedText; // Texto a resumir en lugar de "Texto original"
             } else {
                 // Prompt por defecto para resumen
-                promptForGemini = "Genera un resumen detallado del siguiente texto:\n\n" + extractedText;
+                promptForGemini = "Transforma el siguiente texto en un resumen ideal para una presentación de PowerPoint. Enfócate en la claridad y la concisión, usando títulos de sección y puntos clave en formato de viñetas. El objetivo es que cada viñeta sea fácil de entender de un vistazo. Responde solo con el resumen: '%s'\":\n\n" + extractedText;
             }
 
             // 3. Obtener la respuesta de Gemini (el resumen)
