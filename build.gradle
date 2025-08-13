@@ -36,7 +36,8 @@ dependencies {
 	implementation 'com.google.api-client:google-api-client:2.2.0'
 	implementation 'com.google.apis:google-api-services-youtube:v3-rev20240417-2.0.0'
 	implementation 'com.google.cloud:google-cloud-storage:2.33.0'
-
+	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
 }
 
 bootJar {
