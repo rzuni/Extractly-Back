@@ -10,7 +10,6 @@ import java.awt.Color;
 
 @Service
 public class PptxGeneratorService {
-
     // Constantes para configuración de texto
     private static final int MAX_CHARS_PER_LINE = 90;
     private static final double LINE_SPACING = 10.0;
