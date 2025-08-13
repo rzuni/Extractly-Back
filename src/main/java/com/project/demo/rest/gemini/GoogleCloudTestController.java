@@ -1,4 +1,4 @@
-package com.project.demo.rest;
+package com.project.demo.rest.gemini;
 
 import com.project.demo.service.GoogleCloudApiService;
 import org.springframework.beans.factory.annotation.Autowired;
