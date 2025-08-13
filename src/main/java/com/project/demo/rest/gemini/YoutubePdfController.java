@@ -57,7 +57,7 @@ public class YoutubePdfController {
 
             String resumen = googleCloudApiService.askGemini(finalGeminiPrompt);
 
-            if (resumen == null || resumen.trim().isEmpty() || resumen.contains("No se pudo obtener una respuesta de texto de Gemini.")) { // Check for specific error message
+            if (resumen == null || resumen.trim().isEmpty() || resumen.contains("No se pudo obtener una respuesta de texto de Gemini.")) {
                 System.err.println("Error: El modelo Gemini no pudo generar un resumen útil. Respuesta: " + resumen);
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                         .body("El modelo Gemini no pudo generar un resumen útil. Intenta con un prompt diferente o verifica el contenido del video.".getBytes());
