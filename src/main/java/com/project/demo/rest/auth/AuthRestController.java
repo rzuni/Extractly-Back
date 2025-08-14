@@ -16,7 +16,10 @@ import com.project.demo.logic.entity.user.UserRepository;
 import com.project.demo.rest.passwordReset.PasswordResetController;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -29,7 +32,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -37,6 +39,8 @@ import java.util.UUID;
 @RestController
 public class AuthRestController {
 
+    @Value("${app.frontend.reset-password-url}")
+    private String resetPasswordUrl;
 
     @Autowired
     private UserRepository userRepository;
@@ -56,10 +60,14 @@ public class AuthRestController {
     @Autowired
     public JavaMailSender javaMailSender;
 
-    private final AuthenticationService authenticationService;
-    private final JwtService jwtService;
     @Autowired
     private JavaMailSenderImpl mailSender;
+
+    private final AuthenticationService authenticationService;
+    private final JwtService jwtService;
+    private static final int TOKEN_EXPIRY_HOURS = 1;
+
+    private static final Logger logger = LoggerFactory.getLogger(AuthRestController.class);
 
     public AuthRestController(JwtService jwtService, AuthenticationService authenticationService) {
         this.jwtService = jwtService;
@@ -110,7 +118,7 @@ public class AuthRestController {
         if(userOptional.isPresent()) {
             User user = userOptional.get();
             String token = UUID.randomUUID().toString();
-            LocalDateTime expiryDate = LocalDateTime.now().plusHours(1); //Token valido por 1 hora
+            LocalDateTime expiryDate = LocalDateTime.now().plusHours(TOKEN_EXPIRY_HOURS);
 
             //Invalida cualquier token existente para este usuario para asegurar solo un token válido a la vez
             passwordResetTokenRepository.findByUser(user).ifPresent(passwordResetTokenRepository::delete);
@@ -121,14 +129,13 @@ public class AuthRestController {
             resetToken.setExpiryDate(expiryDate);
             passwordResetTokenRepository.save(resetToken);
 
-            //Enviar Correo
-            String resetLink = "http://localhost:4200/reset-password?token=" + token;
+            String resetLink = resetPasswordUrl + token;
+
             try{
                 sendResetEmail(user.getEmail(), resetLink);
-                System.out.println("Correo de restablecimiento de contraseña enviado a: " + user.getEmail()); //Para depurar, eliminar
+                logger.info("Correo de restablecimiento de contraseña enviado a: {}", user.getEmail());
             } catch (MessagingException e) {
-                System.err.println("Error al enviar el correo de restablecimiento de contraseña: " + e.getMessage());
-                //Elimina el token si el envio del correo falla para evitar token huerfanos
+                logger.info("Error al enviar el correo de restablecimiento de contraseña: {}", e.getMessage());
                 passwordResetTokenRepository.delete(resetToken);
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new MessageResponse("Error al enviar el correo de restablecimiento. Por favor, intentalo de nuevo más tarde"));
             }

@@ -31,7 +31,7 @@ public class SecurityConfiguration {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests((authorize) -> authorize
                         .requestMatchers(HttpMethod.POST, "/auth/**").permitAll()
-                        .requestMatchers("/api/google-cloud/gemini").permitAll()
+                        .requestMatchers("/api/google-cloud/gemini/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement()
@@ -42,5 +42,7 @@ public class SecurityConfiguration {
 
         return http.build();
     }
+
+
 
 }
