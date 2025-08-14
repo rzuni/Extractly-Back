@@ -37,35 +37,27 @@ public class PdfToPptxController {
 
     @PostMapping("/pdf-to-pptx")
     public ResponseEntity<byte[]> uploadPdfAndSummarizeToPptx(
-            @RequestParam("file") MultipartFile pdfFile, // Cambiado el nombre de variable a pdfFile para consistencia
+            @RequestParam("file") MultipartFile pdfFile,
             @RequestParam(value = "customPrompt", required = false) String customPrompt) {
         try {
-            // 1. Extraer el texto del PDF
             String extractedText = pdfTextExtractorService.extractTextFromPdf(pdfFile);
 
-            // 2. Construir el prompt para Gemini (para resumen)
             String promptForGemini;
             if (customPrompt != null && !customPrompt.isEmpty()) {
-                // Si el usuario proporciona un prompt personalizado, úsalo con el texto extraído
-                promptForGemini = customPrompt + "\n\nTexto a resumir: " + extractedText; // Texto a resumir en lugar de "Texto original"
+                promptForGemini = customPrompt + "\n\nTexto a resumir: " + extractedText;
             } else {
-                // Prompt por defecto para resumen
                 promptForGemini = "Genera un resumen detallado del siguiente texto:\n\n" + extractedText;
             }
 
-            // 3. Obtener la respuesta de Gemini (el resumen)
-            String geminiSummaryResponse = googleCloudApiService.askGemini(promptForGemini); // <<< Uso de GoogleCloudApiService y askGemini
+            String geminiSummaryResponse = googleCloudApiService.askGemini(promptForGemini);
 
-            // 4. Generar el archivo PPTX a partir del texto de resumen
             byte[] pptxBytes = pptxGeneratorService.generatePptxFromSummary(geminiSummaryResponse);
 
-            // 5. Configurar los headers para la descarga del archivo PPTX
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.presentationml.presentation"));
             headers.setContentDispositionFormData("attachment", pdfFile.getOriginalFilename() + "-summary.pptx"); // Usa el nombre original del PDF
             headers.setContentLength(pptxBytes.length);
 
-            // 6. Devolver la respuesta con el archivo PPTX
             return new ResponseEntity<>(pptxBytes, headers, HttpStatus.OK);
 
         } catch (IllegalArgumentException e) {
@@ -73,7 +65,7 @@ public class PdfToPptxController {
         } catch (IOException e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(("Error de E/S al procesar el archivo o generar PPTX: " + e.getMessage()).getBytes());
-        } catch (Exception e) { // Captura cualquier otra excepción genérica
+        } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(("Error general del servicio: " + e.getMessage()).getBytes());
         }

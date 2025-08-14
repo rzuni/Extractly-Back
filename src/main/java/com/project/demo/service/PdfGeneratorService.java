@@ -17,7 +17,7 @@ import java.util.List;
 @Service
 public class PdfGeneratorService {
 
-    private final String FONT_PATH = "fonts/OpenSans-Regular.ttf"; // Ruta relativa en resources
+    private final String FONT_PATH = "fonts/OpenSans-Regular.ttf";
 
     public byte[] generatePdfFromText(String text, String filename) throws IOException {
         try (PDDocument document = new PDDocument()) {
@@ -32,7 +32,6 @@ public class PdfGeneratorService {
             float leading = 14.5f;
             float currentY = yStart;
 
-            // Cargar fuente personalizada
             InputStream fontStream = getClass().getClassLoader().getResourceAsStream(FONT_PATH);
             if (fontStream == null) {
                 throw new IOException("No se pudo cargar la fuente desde: " + FONT_PATH);

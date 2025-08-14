@@ -35,9 +35,7 @@ public class YoutubePdfController {
             return ResponseEntity.badRequest()
                     .body("La URL de YouTube no puede estar vacía.".getBytes());
         }
-
         try {
-            // Paso 1: Obtener transcripción del video
             String transcripcion = youtubeToPromptService.generatePromptFromYoutubeUrl(youtubeUrl, languageCode);
 
             if (transcripcion == null || transcripcion.trim().isEmpty() ||
@@ -48,7 +46,6 @@ public class YoutubePdfController {
                         .body("No se pudo obtener una transcripción útil del video. El video podría no tener audio o el idioma no ser compatible.".getBytes());
             }
 
-            // Paso 2: Generar el prompt final para Gemini y resumir
             String baseGeminiPrompt = "Genera un resumen en español, claro y conciso, del siguiente contenido de un video de YouTube, organizando los puntos clave en párrafos separados:\n\n" + transcripcion;
             String finalGeminiPrompt = (customPrompt != null && !customPrompt.trim().isEmpty()) ?
                     customPrompt.trim() + "\n\nContenido a resumir:\n" + transcripcion :
@@ -62,7 +59,6 @@ public class YoutubePdfController {
                         .body("El modelo Gemini no pudo generar un resumen útil. Intenta con un prompt diferente o verifica el contenido del video.".getBytes());
             }
 
-            // Paso 3: Generar el PDF con el resumen
             String nombreArchivo = "resumen_video_gemini.pdf";
             byte[] pdf = pdfGeneratorService.generatePdfFromText(resumen, nombreArchivo);
 
@@ -72,7 +68,6 @@ public class YoutubePdfController {
                         .body("Error al generar el archivo PDF del resumen.".getBytes());
             }
 
-            // Paso 4: Retornar el PDF como archivo descargable
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + nombreArchivo)
                     .contentType(MediaType.APPLICATION_PDF)

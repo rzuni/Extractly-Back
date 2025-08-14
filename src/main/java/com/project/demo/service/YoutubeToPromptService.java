@@ -91,7 +91,6 @@ public class YoutubeToPromptService {
             throw new RuntimeException("Error al ejecutar yt-dlp. Código de salida: " + exitCode + " para URL: " + youtubeUrl + ". Revisa la salida de yt-dlp en los logs.");
         }
 
-        // 2. Subir a GCS
         String gcsObjectName = "youtube-transcripts/" + outputFileName;
 
         BlobId blobId = BlobId.of(bucketName, gcsObjectName);
@@ -99,16 +98,13 @@ public class YoutubeToPromptService {
         storage.create(blobInfo, Files.readAllBytes(localPath));
         String gcsUri = gcsUri(bucketName, gcsObjectName);
 
-        // 3. Transcribir usando Video Intelligence
         String prompt = getTranscriptFromGcs(gcsUri, languageCode);
 
-        // 4. Eliminar archivo local
         try {
             Files.deleteIfExists(localPath);
         } catch (IOException e) {
         }
 
-        // 5. Eliminar archivo de GCS (OPCIONAL, pero recomendado para archivos temporales)
         try {
             storage.delete(blobId);
         } catch (StorageException e) {
@@ -138,7 +134,6 @@ public class YoutubeToPromptService {
 
             OperationFuture<AnnotateVideoResponse, AnnotateVideoProgress> future = client.annotateVideoAsync(request);
 
-            // Espera hasta 15 minutos para la transcripción. Ajusta según la duración del video.
             AnnotateVideoResponse response = future.get(15, TimeUnit.MINUTES);
             StringBuilder transcriptBuilder = new StringBuilder();
 

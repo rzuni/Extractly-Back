@@ -32,17 +32,14 @@ public class YoutubePptxController {
             @RequestParam(defaultValue = "es-ES") String languageCode) {
 
         try {
-            // Paso 1: Obtener la transcripción del video de YouTube
             String transcript = youtubeToPromptService.generatePromptFromYoutubeUrl(youtubeUrl, languageCode);
 
-            // Paso 2: Usar Gemini para resumir la transcripción
             String geminiPrompt = String.format(
                     "Crea un resumen detallado y estructurado en forma de viñetas o puntos clave del siguiente texto: '%s'. El resumen debe ser ideal para una presentación de PowerPoint, con títulos de secciones y puntos concisos. Responde únicamente con el resumen, sin ninguna otra explicación.",
                     transcript
             );
             String summary = googleCloudApiService.askGemini(geminiPrompt);
 
-            // Paso 3: Generar el archivo PPTX con el resumen
             byte[] pptxBytes = pptxGeneratorService.generatePptxFromSummary(summary);
 
             String filename = "resumen_video_" + System.currentTimeMillis() + ".pptx";

@@ -1,92 +1,91 @@
 package com.project.demo.rest.passwordReset;
 
-import com.project.demo.service.PasswordResetService;
-import org.apache.coyote.Response;
+import com.project.demo.logic.entity.passwordResetToken.PasswordResetToken;
+import com.project.demo.logic.entity.passwordResetToken.PasswordResetTokenRepository;
+import com.project.demo.logic.entity.user.User;
+import com.project.demo.logic.entity.user.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
 
-import java.awt.*;
-import java.util.Map;
+import java.time.LocalDateTime;
+import java.util.UUID;
 
-@RestController
-@RequestMapping("/api/auth")
-public class PasswordResetController {
+@Service
+public class PasswordResetController{
 
     @Autowired
-    private PasswordResetService passwordResetService;
+    private UserRepository userRepository;
 
-    @PostMapping("/forgot-password")
-    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request){
-        String email = request.get("email");
-        if(email == null || email.trim().isEmpty()){
-            return ResponseEntity.badRequest().body(Map.of("message", "El correo electrónico es requerido."));
+    @Autowired
+    private PasswordResetTokenRepository tokenRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JavaMailSender mailSender;
+
+    @Value("${app.frontend.url}") // Configurable desde application.properties
+    private String frontUrl;
+
+    private static final int TOKEN_EXPIRATION_MINUTES = 30;
+
+    public void createPasswordResetTokenForUser(String email) {
+        User user = userRepository.findByEmail(email).orElse(null);
+
+        if (user != null) {
+            String token = UUID.randomUUID().toString();
+            LocalDateTime expiryDate = LocalDateTime.now().plusMinutes(TOKEN_EXPIRATION_MINUTES);
+
+            tokenRepository.findByUser(user).ifPresent(tokenRepository::delete);
+
+            PasswordResetToken resetToken = new PasswordResetToken();
+            resetToken.setToken(token);
+            resetToken.setUser(user);
+            resetToken.setExpiryDate(expiryDate);
+            tokenRepository.save(resetToken);
+
+            sendPasswordResetEmail(user, token);
         }
-        //Se devuelve un mensaje generico para no revelar si el correo exite o no.
-        passwordResetService.createPasswordResetTokenForUser(email);
-        return ResponseEntity.ok(Map.of("message", "Si tu correo electrónico esta registrado correctamente, recibiras un enlace para restablecer tu contraseña."));
     }
 
-    @PostMapping("/reset-Password")
-    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request){
+    private void sendPasswordResetEmail(User user, String token) {
+        String resetUrl = frontUrl + "/resetPassword?token=" + token;
+        String subject = "Restablecimiento de contraseña";
+        String body = "Hola " + user.getName() + ",\n\n"
+                + "Si has solicitado restablecer tu contraseña, haz click en el siguiente enlace para continuar: \n"
+                + resetUrl + "\n\n"
+                + "Este enlace expirará en " + TOKEN_EXPIRATION_MINUTES + " minutos. Si no solicitaste esto, ignora este correo.\n\n"
+                + "Atentamente,\nTu equipo";
 
-        if(request.getToken() == null || request.getToken().trim().isEmpty()){
-            return ResponseEntity.badRequest().body(Map.of("message", "El token es requerido."));
-        }
-        if(request.getNewPassword() == null || request.getNewPassword().trim().isEmpty() || request.getConfirmPassword() == null || request.getConfirmPassword().trim().isEmpty()){
-            return ResponseEntity.badRequest().body(Map.of("message", "La nueva contraseña y la confirmación son requeridas."));
-        }
-        if(!request.getNewPassword().equals(request.getConfirmPassword())){
-            return ResponseEntity.badRequest().body(Map.of("message", "Las contraseñas no coinciden."));
-        }
-
-        try{
-            passwordResetService.resetPassword(request.getToken(), request.getNewPassword());
-            return ResponseEntity.ok(Map.of("message", "Contraseña restablecida correctamente."));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        }
+        SimpleMailMessage email = new SimpleMailMessage();
+        email.setTo(user.getEmail());
+        email.setSubject(subject);
+        email.setText(body);
+        mailSender.send(email);
     }
 
-    public static class ResetPasswordRequest{
-        private String token;
-        private String newPassword;
-        private String confirmPassword;
+    public boolean validatePasswordResetToken(String token) {
+        PasswordResetToken resetToken = tokenRepository.findByToken(token).orElse(null);
+        return resetToken != null && resetToken.getExpiryDate().isAfter(LocalDateTime.now());
+    }
 
-        public ResetPasswordRequest(){}
+    public void resetPassword(String token, String newPassword) {
+        PasswordResetToken resetToken = tokenRepository.findByToken(token)
+                .orElseThrow(() -> new RuntimeException("Token inválido o expirado"));
 
-        public ResetPasswordRequest(String token, String newPassword, String confirmPassword){
-            this.token = token;
-            this.newPassword = newPassword;
-            this.confirmPassword = confirmPassword;
+        if (resetToken.getExpiryDate().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("Token expirado");
         }
 
-        public String getToken() {
-            return token;
-        }
+        User user = resetToken.getUser();
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
 
-        public void setToken(String token) {
-            this.token = token;
-        }
-
-        public String getNewPassword() {
-            return newPassword;
-        }
-
-        public void setNewPassword(String newPassword) {
-            this.newPassword = newPassword;
-        }
-
-        public String getConfirmPassword() {
-            return confirmPassword;
-        }
-
-        public void setConfirmPassword(String confirmPassword) {
-            this.confirmPassword = confirmPassword;
-        }
+        tokenRepository.delete(resetToken);
     }
 }

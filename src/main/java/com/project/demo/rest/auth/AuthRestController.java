@@ -16,7 +16,10 @@ import com.project.demo.logic.entity.user.UserRepository;
 import com.project.demo.rest.passwordReset.PasswordResetController;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -29,7 +32,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -37,6 +39,11 @@ import java.util.UUID;
 @RestController
 public class AuthRestController {
 
+    private static final Logger logger = LoggerFactory.getLogger(AuthRestController.class);
+    private static final int TOKEN_EXPIRY_HOURS = 1;
+
+    @Value("${app.frontend.reset-password-url}")
+    private String resetPasswordUrl;
 
     @Autowired
     private UserRepository userRepository;
@@ -56,10 +63,11 @@ public class AuthRestController {
     @Autowired
     public JavaMailSender javaMailSender;
 
-    private final AuthenticationService authenticationService;
-    private final JwtService jwtService;
     @Autowired
     private JavaMailSenderImpl mailSender;
+
+    private final AuthenticationService authenticationService;
+    private final JwtService jwtService;
 
     public AuthRestController(JwtService jwtService, AuthenticationService authenticationService) {
         this.jwtService = jwtService;
@@ -76,26 +84,24 @@ public class AuthRestController {
         loginResponse.setToken(jwtToken);
         loginResponse.setExpiresIn(jwtService.getExpirationTime());
 
-        Optional<User> foundedUser = userRepository.findByEmail(user.getEmail());
-
-        foundedUser.ifPresent(loginResponse::setAuthUser);
+        userRepository.findByEmail(user.getEmail()).ifPresent(loginResponse::setAuthUser);
 
         return ResponseEntity.ok(loginResponse);
     }
 
     @PostMapping("/signup")
     public ResponseEntity<?> registerUser(@RequestBody User user) {
-        Optional<User> existingUser = userRepository.findByEmail(user.getEmail());
-        if (existingUser.isPresent()) {
+        if (userRepository.findByEmail(user.getEmail()).isPresent()) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body("Email already in use");
         }
 
         user.setPassword(passwordEncoder.encode(user.getPassword()));
-        Optional<Role> optionalRole = roleRepository.findByName(RoleEnum.USER);
 
+        Optional<Role> optionalRole = roleRepository.findByName(RoleEnum.USER);
         if (optionalRole.isEmpty()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Role not found");
         }
+
         user.setRole(optionalRole.get());
         User savedUser = userRepository.save(user);
         return ResponseEntity.ok(savedUser);
@@ -104,15 +110,13 @@ public class AuthRestController {
     @PostMapping("/forgot-password")
     public ResponseEntity<MessageResponse> forgotPassword(@RequestBody ForgotPasswordRequest request) {
         String email = request.getEmail();
-
         Optional<User> userOptional = userRepository.findByEmail(email);
 
-        if(userOptional.isPresent()) {
+        if (userOptional.isPresent()) {
             User user = userOptional.get();
             String token = UUID.randomUUID().toString();
-            LocalDateTime expiryDate = LocalDateTime.now().plusHours(1); //Token valido por 1 hora
+            LocalDateTime expiryDate = LocalDateTime.now().plusHours(TOKEN_EXPIRY_HOURS);
 
-            //Invalida cualquier token existente para este usuario para asegurar solo un token válido a la vez
             passwordResetTokenRepository.findByUser(user).ifPresent(passwordResetTokenRepository::delete);
 
             PasswordResetToken resetToken = new PasswordResetToken();
@@ -121,18 +125,19 @@ public class AuthRestController {
             resetToken.setExpiryDate(expiryDate);
             passwordResetTokenRepository.save(resetToken);
 
-            //Enviar Correo
-            String resetLink = "http://localhost:4200/reset-password?token=" + token;
-            try{
+            String resetLink = resetPasswordUrl + token;
+
+            try {
                 sendResetEmail(user.getEmail(), resetLink);
-                System.out.println("Correo de restablecimiento de contraseña enviado a: " + user.getEmail()); //Para depurar, eliminar
+                logger.info("Correo de restablecimiento de contraseña enviado a: {}", user.getEmail());
             } catch (MessagingException e) {
-                System.err.println("Error al enviar el correo de restablecimiento de contraseña: " + e.getMessage());
-                //Elimina el token si el envio del correo falla para evitar token huerfanos
+                logger.error("Error al enviar el correo de restablecimiento de contraseña: {}", e.getMessage());
                 passwordResetTokenRepository.delete(resetToken);
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new MessageResponse("Error al enviar el correo de restablecimiento. Por favor, intentalo de nuevo más tarde"));
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(new MessageResponse("Error al enviar el correo de restablecimiento. Por favor, inténtalo de nuevo más tarde"));
             }
         }
+
         return ResponseEntity.ok(new MessageResponse("Si tu correo está registrado, recibirás un enlace de restablecimiento."));
     }
 
@@ -150,45 +155,40 @@ public class AuthRestController {
 
     @PostMapping("/reset-password")
     public ResponseEntity<MessageResponse> resetPassword(@RequestBody ResetPasswordRequest request) {
-
         String token = request.getToken();
         String newPassword = request.getNewPassword();
         String confirmPassword = request.getConfirmPassword();
 
-        if(!newPassword.equals(confirmPassword)) {
+        if (!newPassword.equals(confirmPassword)) {
             return ResponseEntity.badRequest().body(new MessageResponse("La nueva contraseña y su confirmación no coinciden"));
         }
 
-        if(newPassword.length() < 8){
+        if (newPassword.length() < 8) {
             return ResponseEntity.badRequest().body(new MessageResponse("La contraseña debe contener al menos 8 caracteres"));
         }
 
         Optional<PasswordResetToken> tokenOptional = passwordResetTokenRepository.findByToken(token);
-
-        if(tokenOptional.isEmpty()){
+        if (tokenOptional.isEmpty()) {
             return ResponseEntity.badRequest().body(new MessageResponse("Token de restablecimiento de contraseña inválido o expirado"));
         }
 
         PasswordResetToken resetToken = tokenOptional.get();
 
-        if(resetToken.getExpiryDate().isBefore(LocalDateTime.now())) {
+        if (resetToken.getExpiryDate().isBefore(LocalDateTime.now())) {
             passwordResetTokenRepository.delete(resetToken);
             return ResponseEntity.badRequest().body(new MessageResponse("Token de restablecimiento de contraseña inválido o expirado"));
         }
 
         User user = resetToken.getUser();
-        if(user == null){
+        if (user == null) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new MessageResponse("Usuario no encontrado"));
         }
 
-        //Actualiza contraseña
         user.setPassword(passwordEncoder.encode(newPassword));
         userRepository.save(user);
 
-        //Elimina el token después de un restablecimiento
         passwordResetTokenRepository.delete(resetToken);
 
         return ResponseEntity.ok(new MessageResponse("¡La contraseña ha sido restablecida con éxito!"));
     }
-
 }

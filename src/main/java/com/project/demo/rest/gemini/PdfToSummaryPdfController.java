@@ -35,26 +35,19 @@ public class PdfToSummaryPdfController {
             @RequestParam(value = "customPrompt", required = false) String customPrompt) {
         try {
 
-            // 1. Extraer texto del PDF
             String extractedText = pdfTextExtractorService.extractTextFromPdf(pdfFile);
 
-            // 2. Construir el prompt para Gemini (para resumen)
             String promptForGemini;
             if (customPrompt != null && !customPrompt.isEmpty()) {
-                // Si el usuario proporciona un prompt personalizado, úsalo con el texto extraído
                 promptForGemini = customPrompt + "\n\nTexto original: " + extractedText;
             } else {
-                // Prompt por defecto para resumen
                 promptForGemini = "Genera un resumen detallado del siguiente:\n\n" + extractedText;
             }
 
-            // 3. Obtener la respuesta de Gemini (el resumen)
             String geminiResponse = googleCloudApiService.askGemini(promptForGemini);
 
-            // 4. Generar el PDF con la respuesta de Gemini
             byte[] pdfBytes = pdfGeneratorService.generatePdfFromText(geminiResponse, "resumen_gemini.pdf");
 
-            // 5. Configurar la respuesta HTTP para el PDF
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_PDF);
             headers.setContentDispositionFormData("attachment", "resumen_gemini.pdf");
